@@ -1,6 +1,6 @@
 # AutoLog
 
-AutoLog is a personal car service and maintenance log app for tracking vehicle repairs, oil changes, tire replacements, and technical inspections. It helps car owners organize service history from oldest to newest, attach receipt photos, and monitor total maintenance expenses.
+AutoLog is a personal car service and maintenance log app for tracking vehicle repairs, oil changes, tire replacements, and technical inspections. It helps car owners organize service history from oldest to newest, attach receipt photos, and monitor total maintenance expenses
 
 ## Run the project
 
