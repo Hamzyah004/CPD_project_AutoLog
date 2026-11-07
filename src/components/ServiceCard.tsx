@@ -1,34 +1,61 @@
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import {
+  Image,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+  type StyleProp,
+  type ViewStyle,
+} from 'react-native';
+import { FontSize, Radius, Spacing } from '@/constants/theme';
+import { useTheme } from '@/hooks/use-theme';
 import type { ServiceLog } from '@/types';
 
 type ServiceCardProps = {
   service: ServiceLog;
   onSelect?: (service: ServiceLog) => void;
+  style?: StyleProp<ViewStyle>;
 };
 
-export default function ServiceCard({ service, onSelect }: ServiceCardProps) {
+export default function ServiceCard({ service, onSelect, style }: ServiceCardProps) {
+  const theme = useTheme();
+
   return (
     <Pressable
       onPress={() => {
         console.log('Open', service.id);
         onSelect?.(service);
       }}
-      style={({ pressed }) => [styles.card, pressed && styles.pressed]}
+      style={({ pressed }) => [
+        styles.card,
+        { backgroundColor: theme.card, borderColor: theme.border },
+        pressed && styles.pressed,
+        style,
+      ]}
     >
-      <View style={styles.imageBanner}>
+      <View style={[styles.photoContainer, { backgroundColor: theme.photoBg }]}>
         <Image
           source={{ uri: service.photoUrl }}
-          style={styles.image}
+          style={styles.photo}
           resizeMode="contain"
         />
+        <Text
+          style={[
+            styles.badge,
+            { backgroundColor: theme.primary, color: theme.onPrimary },
+          ]}
+        >
+          {service.category}
+        </Text>
       </View>
+
       <View style={styles.content}>
-        <Text style={styles.title}>{service.title}</Text>
-        <Text style={styles.details}>
+        <Text style={[styles.title, { color: theme.text }]}>{service.title}</Text>
+        <Text style={[styles.details, { color: theme.muted }]}>
           {service.date} · {service.shop}
         </Text>
-        <Text style={styles.meta}>
-          {service.mileageKm.toLocaleString()} km · {service.costBam} KM · {service.category}
+        <Text style={[styles.meta, { color: theme.primary }]}>
+          {service.mileageKm.toLocaleString()} km · {service.costBam} KM
         </Text>
       </View>
     </Pressable>
@@ -37,39 +64,48 @@ export default function ServiceCard({ service, onSelect }: ServiceCardProps) {
 
 const styles = StyleSheet.create({
   card: {
-    borderRadius: 12,
+    borderRadius: Radius.md,
+    borderWidth: 1,
     overflow: 'hidden',
-    backgroundColor: '#E6EEF7',
   },
   pressed: {
     opacity: 0.6,
   },
-  imageBanner: {
-    backgroundColor: '#DAE4F0',
-    paddingVertical: 18,
+  photoContainer: {
+    width: '100%',
+    aspectRatio: 16 / 9,
+    padding: Spacing.md,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  image: {
+  photo: {
     width: '100%',
-    height: 90,
+    height: '100%',
+  },
+  badge: {
+    position: 'absolute',
+    top: Spacing.sm,
+    right: Spacing.sm,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: Spacing.xs,
+    borderRadius: Radius.pill,
+    fontSize: FontSize.small,
+    fontWeight: 'bold',
+    overflow: 'hidden',
   },
   content: {
-    padding: 12,
-    gap: 4,
+    padding: Spacing.md,
+    gap: Spacing.xs,
   },
   title: {
-    fontSize: 16,
+    fontSize: FontSize.body,
     fontWeight: 'bold',
-    color: '#1E293B',
   },
   details: {
-    fontSize: 14,
-    color: '#475569',
+    fontSize: FontSize.small,
   },
   meta: {
-    fontSize: 13,
+    fontSize: FontSize.small,
     fontWeight: '600',
-    color: '#2563EB',
   },
 });

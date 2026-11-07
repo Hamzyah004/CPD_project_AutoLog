@@ -1,4 +1,7 @@
 import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { FontSize, Radius, Spacing } from '@/constants/theme';
+import { useTheme } from '@/hooks/use-theme';
 import type { ServiceLog } from '@/types';
 
 type ServiceDetailsProps = {
@@ -7,45 +10,111 @@ type ServiceDetailsProps = {
 };
 
 export default function ServiceDetails({ service, onBack }: ServiceDetailsProps) {
+  const theme = useTheme();
+  const insets = useSafeAreaInsets();
+
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      {onBack ? (
-        <View style={styles.topBar}>
-          <Pressable
-            onPress={onBack}
-            style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}
-          >
-            <Text style={styles.backText}>← Back to Services Log</Text>
-          </Pressable>
-        </View>
-      ) : null}
-
-      <View style={styles.imageBanner}>
-        <Image
-          source={{ uri: service.photoUrl }}
-          style={styles.image}
-          resizeMode="contain"
-        />
-      </View>
-
-      <View style={styles.body}>
-        <Text style={styles.title}>{service.title}</Text>
-        <Text style={styles.car}>{service.car}</Text>
-
-        <View style={styles.infoBox}>
-          <Text style={styles.row}>Service shop: {service.shop}</Text>
-          <Text style={styles.row}>Date: {service.date}</Text>
-          <Text style={styles.row}>Mileage: {service.mileageKm.toLocaleString()} km</Text>
-          <Text style={styles.row}>Cost: {service.costBam} KM</Text>
-          <Text style={styles.row}>Category: {service.category}</Text>
-        </View>
-
-        {service.notes ? (
-          <View style={styles.notesSection}>
-            <Text style={styles.notesHeading}>Service Notes</Text>
-            <Text style={styles.notes}>{service.notes}</Text>
+    <ScrollView
+      contentContainerStyle={[
+        styles.container,
+        {
+          backgroundColor: theme.background,
+          paddingBottom: Spacing.lg + insets.bottom,
+        },
+      ]}
+    >
+      <View style={styles.maxWidthBox}>
+        {onBack ? (
+          <View style={styles.topBar}>
+            <Pressable
+              onPress={onBack}
+              style={({ pressed }) => [
+                styles.backButton,
+                { backgroundColor: theme.secondaryBg, borderColor: theme.border },
+                pressed && styles.pressed,
+              ]}
+            >
+              <Text style={[styles.backText, { color: theme.text }]}>
+                ← Back to Services Log
+              </Text>
+            </Pressable>
           </View>
         ) : null}
+
+        <View style={[styles.photoWrapper, { backgroundColor: theme.photoBg }]}>
+          <Image
+            source={{ uri: service.photoUrl }}
+            style={styles.photo}
+            resizeMode="contain"
+          />
+          <Text
+            style={[
+              styles.badge,
+              { backgroundColor: theme.primary, color: theme.onPrimary },
+            ]}
+          >
+            {service.category}
+          </Text>
+        </View>
+
+        <View style={styles.body}>
+          <Text style={[styles.title, { color: theme.text }]}>{service.title}</Text>
+          <Text style={[styles.car, { color: theme.primary }]}>{service.car}</Text>
+
+          <View
+            style={[
+              styles.infoBox,
+              { backgroundColor: theme.card, borderColor: theme.border },
+            ]}
+          >
+            <View style={[styles.row, { borderBottomColor: theme.border }]}>
+              <Text style={[styles.rowLabel, { color: theme.muted }]}>Service shop</Text>
+              <Text style={[styles.rowValue, { color: theme.text }]}>{service.shop}</Text>
+            </View>
+
+            <View style={[styles.row, { borderBottomColor: theme.border }]}>
+              <Text style={[styles.rowLabel, { color: theme.muted }]}>Date</Text>
+              <Text style={[styles.rowValue, { color: theme.text }]}>{service.date}</Text>
+            </View>
+
+            <View style={[styles.row, { borderBottomColor: theme.border }]}>
+              <Text style={[styles.rowLabel, { color: theme.muted }]}>Mileage</Text>
+              <Text style={[styles.rowValue, { color: theme.text }]}>
+                {service.mileageKm.toLocaleString()} km
+              </Text>
+            </View>
+
+            <View style={[styles.row, { borderBottomColor: theme.border }]}>
+              <Text style={[styles.rowLabel, { color: theme.muted }]}>Cost</Text>
+              <Text style={[styles.rowValue, { color: theme.primary }]}>
+                {service.costBam} KM
+              </Text>
+            </View>
+
+            <View style={styles.rowLast}>
+              <Text style={[styles.rowLabel, { color: theme.muted }]}>Category</Text>
+              <Text style={[styles.rowValue, { color: theme.text }]}>
+                {service.category}
+              </Text>
+            </View>
+          </View>
+
+          {service.notes ? (
+            <View
+              style={[
+                styles.notesSection,
+                { backgroundColor: theme.card, borderColor: theme.border },
+              ]}
+            >
+              <Text style={[styles.notesHeading, { color: theme.text }]}>
+                Service Notes
+              </Text>
+              <Text style={[styles.notes, { color: theme.muted }]}>
+                {service.notes}
+              </Text>
+            </View>
+          ) : null}
+        </View>
       </View>
     </ScrollView>
   );
@@ -53,73 +122,106 @@ export default function ServiceDetails({ service, onBack }: ServiceDetailsProps)
 
 const styles = StyleSheet.create({
   container: {
-    paddingBottom: 24,
+    flexGrow: 1,
+  },
+  maxWidthBox: {
+    width: '100%',
+    maxWidth: 600,
+    alignSelf: 'center',
   },
   topBar: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
   },
   backButton: {
     alignSelf: 'flex-start',
-    backgroundColor: '#E2E8F0',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    borderRadius: Radius.sm,
+    borderWidth: 1,
   },
   pressed: {
     opacity: 0.6,
   },
   backText: {
-    fontSize: 14,
+    fontSize: FontSize.small,
     fontWeight: '600',
-    color: '#1E293B',
   },
-  imageBanner: {
-    backgroundColor: '#DAE4F0',
-    paddingVertical: 24,
+  photoWrapper: {
+    width: '100%',
+    aspectRatio: 16 / 9,
+    padding: Spacing.lg,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  image: {
+  photo: {
     width: '100%',
-    height: 130,
+    height: '100%',
+  },
+  badge: {
+    position: 'absolute',
+    top: Spacing.sm,
+    right: Spacing.sm,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: Spacing.xs,
+    borderRadius: Radius.pill,
+    fontSize: FontSize.small,
+    fontWeight: 'bold',
+    overflow: 'hidden',
   },
   body: {
-    padding: 16,
-    gap: 12,
+    padding: Spacing.md,
+    gap: Spacing.md,
   },
   title: {
-    fontSize: 22,
+    fontSize: FontSize.hero,
     fontWeight: 'bold',
-    color: '#0F172A',
   },
   car: {
-    fontSize: 16,
+    fontSize: FontSize.body,
     fontWeight: '600',
-    color: '#2563EB',
   },
   infoBox: {
-    backgroundColor: '#E6EEF7',
-    borderRadius: 12,
-    padding: 14,
-    gap: 8,
+    borderRadius: Radius.md,
+    borderWidth: 1,
+    padding: Spacing.md,
+    gap: Spacing.sm,
   },
   row: {
-    fontSize: 15,
-    color: '#1E293B',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: Spacing.md,
+    paddingBottom: Spacing.sm,
+    borderBottomWidth: 1,
+  },
+  rowLast: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: Spacing.md,
+  },
+  rowLabel: {
+    fontSize: FontSize.body,
+  },
+  rowValue: {
+    fontSize: FontSize.body,
+    fontWeight: '600',
+    flexShrink: 1,
+    textAlign: 'right',
   },
   notesSection: {
-    marginTop: 4,
-    gap: 6,
+    borderRadius: Radius.md,
+    borderWidth: 1,
+    padding: Spacing.md,
+    gap: Spacing.xs,
   },
   notesHeading: {
-    fontSize: 16,
+    fontSize: FontSize.body,
     fontWeight: 'bold',
-    color: '#0F172A',
   },
   notes: {
-    fontSize: 15,
+    fontSize: FontSize.body,
     lineHeight: 22,
-    color: '#334155',
   },
 });
