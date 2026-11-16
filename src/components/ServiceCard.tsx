@@ -14,10 +14,16 @@ import type { ServiceLog } from '@/types';
 type ServiceCardProps = {
   service: ServiceLog;
   onSelect?: (service: ServiceLog) => void;
+  onLongPress?: () => void;
   style?: StyleProp<ViewStyle>;
 };
 
-export default function ServiceCard({ service, onSelect, style }: ServiceCardProps) {
+export default function ServiceCard({
+  service,
+  onSelect,
+  onLongPress,
+  style,
+}: ServiceCardProps) {
   const theme = useTheme();
 
   return (
@@ -26,6 +32,11 @@ export default function ServiceCard({ service, onSelect, style }: ServiceCardPro
         console.log('Open', service.id);
         onSelect?.(service);
       }}
+      onLongPress={onLongPress}
+      accessibilityRole="button"
+      accessibilityLabel={`${service.title}, ${service.shop}, ${service.mileageKm} km, ${service.costBam} KM, ${service.category}`}
+      accessibilityHint="Long press to delete"
+      android_ripple={{ color: theme.border }}
       style={({ pressed }) => [
         styles.card,
         { backgroundColor: theme.card, borderColor: theme.border },

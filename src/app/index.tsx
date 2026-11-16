@@ -1,5 +1,8 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
+  ActivityIndicator,
+  Alert,
+  FlatList,
   Image,
   Pressable,
   ScrollView,
@@ -10,12 +13,15 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import EmptyState from '@/components/EmptyState';
+import FilterChip from '@/components/FilterChip';
 import ServiceCard from '@/components/ServiceCard';
 import ServiceDetails from '@/components/ServiceDetails';
 import { FontSize, Radius, Spacing } from '@/constants/theme';
-import { cars, services } from '@/data/services';
+import { fetchServices } from '@/data/api';
+import { cars } from '@/data/services';
 import { useTheme } from '@/hooks/use-theme';
-import type { Car, ServiceLog } from '@/types';
+import type { Car, ServiceCategory, ServiceLog } from '@/types';
 
 type ScreenName =
   | 'auth'
@@ -26,6 +32,16 @@ type ScreenName =
   | 'settings';
 
 type BottomTab = 'services' | 'car-info' | 'summary';
+type CategoryFilter = 'all' | ServiceCategory;
+type SortOption = 'oldest' | 'newest' | 'cost';
+
+const CATEGORIES: CategoryFilter[] = [
+  'all',
+  'maintenance',
+  'repair',
+  'inspection',
+  'tires',
+];
 
 export default function HomeScreen() {
   const theme = useTheme();
@@ -39,17 +55,84 @@ export default function HomeScreen() {
   const [activeTab, setActiveTab] = useState<BottomTab>('services');
   const [selectedService, setSelectedService] = useState<ServiceLog | null>(null);
 
-  // Responsive grid columns (Task 6): 1 on phones, 2 from 600 dp, 3 from 900 dp
+  // Week 6 (Task 4, 5, 6, 8): Async list state, loading/error status, pull-to-refresh, filter & sort
+  const [serviceList, setServiceList] = useState<ServiceLog[]>([]);
+  const [status, setStatus] = useState<'loading' | 'error' | 'ready'>('loading');
+  const [attempt, setAttempt] = useState(0);
+  const [refreshing, setRefreshing] = useState(false);
+  const [filter, setFilter] = useState<CategoryFilter>('all');
+  const [sortBy, setSortBy] = useState<SortOption>('oldest');
+
+  useEffect(() => {
+    let ignore = false;
+
+    async function load() {
+      try {
+        const data = await fetchServices();
+        if (!ignore) {
+          setServiceList(data);
+          setStatus('ready');
+        }
+      } catch {
+        if (!ignore) {
+          setStatus('error');
+        }
+      }
+    }
+
+    load();
+    return () => {
+      ignore = true;
+    };
+  }, [attempt]);
+
+  async function refresh() {
+    setRefreshing(true);
+    try {
+      const data = await fetchServices();
+      setServiceList(data);
+    } catch {
+      // Keep existing items visible if pull-to-refresh fails
+    } finally {
+      setRefreshing(false);
+    }
+  }
+
+  function confirmDelete(service: ServiceLog) {
+    Alert.alert('Delete service?', `"${service.title}" will be removed.`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: () =>
+          setServiceList((list) => list.filter((s) => s.id !== service.id)),
+      },
+    ]);
+  }
+
+  // Responsive grid columns (Task 2): 1 on phones, 2 from 600 dp, 3 from 900 dp
   const columns = width >= 900 ? 3 : width >= 600 ? 2 : 1;
   const cardWidth = (width - 2 * Spacing.md - (columns - 1) * Spacing.md) / columns;
 
-  // Filter services for the selected car and calculate summary values with reduce (Task 5)
-  const carServices = services.filter((item) => item.carId === selectedCar.id);
+  // Filter services for the selected car and calculate summary values with reduce
+  const carServices = serviceList.filter((item) => item.carId === selectedCar.id);
   const totalExpenses = carServices.reduce((sum, item) => sum + item.costBam, 0);
   const maxServiceCost = carServices.reduce(
     (max, item) => (item.costBam > max ? item.costBam : max),
     0
   );
+
+  // Task 6 & 8: Filter by category and sort a copy so state array is never mutated
+  const filteredServices =
+    filter === 'all'
+      ? carServices
+      : carServices.filter((item) => item.category === filter);
+
+  const visibleServices = [...filteredServices].sort((a, b) => {
+    if (sortBy === 'newest') return b.date.localeCompare(a.date);
+    if (sortBy === 'cost') return b.costBam - a.costBam;
+    return a.date.localeCompare(b.date);
+  });
 
   // 1. LOGIN / REGISTER SCREEN
   if (screen === 'auth') {
@@ -209,6 +292,7 @@ export default function HomeScreen() {
               onPress={() => {
                 setSelectedCar(car);
                 setSelectedService(null);
+                setFilter('all');
                 setActiveTab('services');
                 setScreen('home');
               }}
@@ -700,95 +784,212 @@ export default function HomeScreen() {
               service={selectedService}
               onBack={() => setSelectedService(null)}
             />
+          ) : status === 'loading' ? (
+            <View style={styles.centerState}>
+              <ActivityIndicator size="large" color={theme.primary} />
+            </View>
+          ) : status === 'error' ? (
+            <View style={styles.centerState}>
+              <Text style={[styles.errorText, { color: theme.text }]}>
+                Could not load services
+              </Text>
+              <Pressable
+                onPress={() => {
+                  setStatus('loading');
+                  setAttempt((a) => a + 1);
+                }}
+                style={({ pressed }) => [
+                  styles.addServiceBtn,
+                  { backgroundColor: theme.primary },
+                  pressed && styles.pressed,
+                ]}
+              >
+                <Text
+                  style={[styles.addServiceBtnText, { color: theme.onPrimary }]}
+                >
+                  Try again
+                </Text>
+              </Pressable>
+            </View>
           ) : (
-            <ScrollView
+            <FlatList
+              key={columns}
+              data={visibleServices}
+              numColumns={columns}
+              keyExtractor={(service) => service.id}
+              refreshing={refreshing}
+              onRefresh={refresh}
+              columnWrapperStyle={
+                columns > 1 ? { gap: Spacing.md } : undefined
+              }
+              ItemSeparatorComponent={() => (
+                <View style={{ height: Spacing.md }} />
+              )}
               contentContainerStyle={[
-                styles.scrollContent,
+                styles.listContainer,
                 { paddingBottom: Spacing.md + insets.bottom },
               ]}
-            >
-              <View style={styles.rowBetween}>
-                <View style={styles.headerTextCol}>
-                  <Text style={[styles.pageTitle, { color: theme.text }]}>
-                    Services Log
-                  </Text>
-                  <Text style={[styles.count, { color: theme.muted }]}>
-                    {carServices.length} services (Oldest → Newest)
-                  </Text>
-                </View>
-                <Pressable
-                  onPress={() => setScreen('add-service')}
-                  style={({ pressed }) => [
-                    styles.addServiceBtn,
-                    { backgroundColor: theme.primary },
-                    pressed && styles.pressed,
-                  ]}
-                >
-                  <Text
-                    style={[styles.addServiceBtnText, { color: theme.onPrimary }]}
-                  >
-                    + Add Service
-                  </Text>
-                </Pressable>
-              </View>
+              ListHeaderComponentStyle={{ marginBottom: Spacing.md }}
+              ListHeaderComponent={
+                <View style={styles.listHeader}>
+                  <View style={styles.rowBetween}>
+                    <View style={styles.headerTextCol}>
+                      <Text style={[styles.pageTitle, { color: theme.text }]}>
+                        Services Log
+                      </Text>
+                      <Text style={[styles.count, { color: theme.muted }]}>
+                        {visibleServices.length} of {carServices.length} services
+                      </Text>
+                    </View>
+                    <Pressable
+                      onPress={() => setScreen('add-service')}
+                      style={({ pressed }) => [
+                        styles.addServiceBtn,
+                        { backgroundColor: theme.primary },
+                        pressed && styles.pressed,
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.addServiceBtnText,
+                          { color: theme.onPrimary },
+                        ]}
+                      >
+                        + Add Service
+                      </Text>
+                    </Pressable>
+                  </View>
 
-              {/* Task 5: Summary Row of 3 equal-width boxes calculated with reduce */}
-              <View style={styles.summaryRow}>
-                <View
-                  style={[
-                    styles.summaryBox,
-                    { backgroundColor: theme.card, borderColor: theme.border },
-                  ]}
-                >
-                  <Text style={[styles.summaryBoxValue, { color: theme.primary }]}>
-                    {carServices.length}
-                  </Text>
-                  <Text style={[styles.summaryBoxLabel, { color: theme.muted }]}>
-                    services
-                  </Text>
-                </View>
+                  {/* Summary Row of 3 equal-width boxes calculated with reduce */}
+                  <View style={styles.summaryRow}>
+                    <View
+                      style={[
+                        styles.summaryBox,
+                        {
+                          backgroundColor: theme.card,
+                          borderColor: theme.border,
+                        },
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.summaryBoxValue,
+                          { color: theme.primary },
+                        ]}
+                      >
+                        {carServices.length}
+                      </Text>
+                      <Text
+                        style={[styles.summaryBoxLabel, { color: theme.muted }]}
+                      >
+                        services
+                      </Text>
+                    </View>
 
-                <View
-                  style={[
-                    styles.summaryBox,
-                    { backgroundColor: theme.card, borderColor: theme.border },
-                  ]}
-                >
-                  <Text style={[styles.summaryBoxValue, { color: theme.primary }]}>
-                    {totalExpenses}
-                  </Text>
-                  <Text style={[styles.summaryBoxLabel, { color: theme.muted }]}>
-                    total KM
-                  </Text>
-                </View>
+                    <View
+                      style={[
+                        styles.summaryBox,
+                        {
+                          backgroundColor: theme.card,
+                          borderColor: theme.border,
+                        },
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.summaryBoxValue,
+                          { color: theme.primary },
+                        ]}
+                      >
+                        {totalExpenses}
+                      </Text>
+                      <Text
+                        style={[styles.summaryBoxLabel, { color: theme.muted }]}
+                      >
+                        total KM
+                      </Text>
+                    </View>
 
-                <View
-                  style={[
-                    styles.summaryBox,
-                    { backgroundColor: theme.card, borderColor: theme.border },
-                  ]}
-                >
-                  <Text style={[styles.summaryBoxValue, { color: theme.primary }]}>
-                    {maxServiceCost}
-                  </Text>
-                  <Text style={[styles.summaryBoxLabel, { color: theme.muted }]}>
-                    max KM
-                  </Text>
-                </View>
-              </View>
+                    <View
+                      style={[
+                        styles.summaryBox,
+                        {
+                          backgroundColor: theme.card,
+                          borderColor: theme.border,
+                        },
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.summaryBoxValue,
+                          { color: theme.primary },
+                        ]}
+                      >
+                        {maxServiceCost}
+                      </Text>
+                      <Text
+                        style={[styles.summaryBoxLabel, { color: theme.muted }]}
+                      >
+                        max KM
+                      </Text>
+                    </View>
+                  </View>
 
-              {/* Task 6: Responsive 1, 2, or 3 column grid */}
-              <View style={styles.grid}>
-                {carServices.map((service) => (
-                  <ServiceCard
-                    key={service.id}
-                    service={service}
-                    onSelect={(item) => setSelectedService(item)}
-                    style={{ width: cardWidth }}
-                  />
-                ))}
-              </View>
-            </ScrollView>
+                  {/* Task 6: Category Filter Chips */}
+                  <View style={styles.chipRow}>
+                    {CATEGORIES.map((category) => (
+                      <FilterChip
+                        key={category}
+                        label={category === 'all' ? 'All' : category}
+                        selected={filter === category}
+                        onPress={() => setFilter(category)}
+                      />
+                    ))}
+                  </View>
+
+                  {/* Task 8: Sort Chips */}
+                  <View style={styles.chipRow}>
+                    <FilterChip
+                      label="Oldest"
+                      selected={sortBy === 'oldest'}
+                      onPress={() => setSortBy('oldest')}
+                    />
+                    <FilterChip
+                      label="Newest"
+                      selected={sortBy === 'newest'}
+                      onPress={() => setSortBy('newest')}
+                    />
+                    <FilterChip
+                      label="Highest cost"
+                      selected={sortBy === 'cost'}
+                      onPress={() => setSortBy('cost')}
+                    />
+                  </View>
+                </View>
+              }
+              ListEmptyComponent={
+                <EmptyState
+                  title={
+                    filter === 'all'
+                      ? 'No services yet'
+                      : `No ${filter} services`
+                  }
+                  message={
+                    filter === 'all'
+                      ? 'Your car services will appear here.'
+                      : 'Choose another category.'
+                  }
+                />
+              }
+              renderItem={({ item }) => (
+                <ServiceCard
+                  service={item}
+                  onSelect={(service) => setSelectedService(service)}
+                  onLongPress={() => confirmDelete(item)}
+                  style={{ width: cardWidth }}
+                />
+              )}
+            />
           ))}
 
         {activeTab === 'car-info' && (
@@ -1074,6 +1275,30 @@ const styles = StyleSheet.create({
   },
   mainArea: {
     flex: 1,
+  },
+  centerState: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: Spacing.lg,
+    gap: Spacing.md,
+  },
+  errorText: {
+    fontSize: FontSize.title,
+    fontWeight: 'bold',
+    textAlign: 'center',
+  },
+  listContainer: {
+    flexGrow: 1,
+    padding: Spacing.md,
+  },
+  listHeader: {
+    gap: Spacing.md,
+  },
+  chipRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Spacing.sm,
   },
   maxWidthBox: {
     width: '100%',
